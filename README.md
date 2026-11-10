@@ -1,8 +1,7 @@
 # paraprosdokian-htf
 
-An AWS CDK (TypeScript) app that provisions a production-shaped, but
-intentionally minimal, Amazon EKS cluster to serve as the backend platform
-for an HFT (high-frequency trading) firm.
+This is an AWS CDK (TypeScript) app that provisions a Amazon EKS cluster to serve as the backend platform
+for a high-frequency trading operation.
 
 ## Architecture
 
