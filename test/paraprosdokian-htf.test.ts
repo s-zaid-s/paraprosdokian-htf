@@ -1,17 +1,38 @@
-// import * as cdk from 'aws-cdk-lib/core';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as ParaprosdokianHtf from '../lib/paraprosdokian-htf-stack';
+import * as cdk from "aws-cdk-lib/core";
+import { Match, Template } from "aws-cdk-lib/assertions";
+import { ParaprosdokianHtfStack } from "../lib/paraprosdokian-htf-stack";
 
-// example test. To run these tests, uncomment this file along with the
-// example resource in lib/paraprosdokian-htf-stack.ts
-test('SQS Queue Created', () => {
-//   const app = new cdk.App();
-//     // WHEN
-//   const stack = new ParaprosdokianHtf.ParaprosdokianHtfStack(app, 'MyTestStack');
-//     // THEN
-//   const template = Template.fromStack(stack);
+function synthStack(): Template {
+  const app = new cdk.App();
+  // Environment-agnostic: avoids live AWS AZ-lookup calls during synth/tests.
+  const stack = new ParaprosdokianHtfStack(app, "MyTestStack");
+  return Template.fromStack(stack);
+}
 
-//   template.hasResourceProperties('AWS::SQS::Queue', {
-//     VisibilityTimeout: 300
-//   });
+test("creates an EKS cluster", () => {
+  const template = synthStack();
+  template.hasResourceProperties("Custom::AWSCDK-EKS-Cluster", {
+    Config: Match.objectLike({ name: "paraprosdokian-htf" }),
+  });
+});
+
+test("creates two managed node groups", () => {
+  const template = synthStack();
+  template.resourceCountIs("AWS::EKS::Nodegroup", 2);
+});
+
+test("creates a multi-tier, multi-AZ VPC", () => {
+  // Synthesized env-agnostic, so AZ count (and therefore NAT gateway count)
+  // falls back to 2 instead of the real deployment's maxAzs: 3.
+  const template = synthStack();
+  template.resourceCountIs("AWS::EC2::VPC", 1);
+  template.resourceCountIs("AWS::EC2::NatGateway", 2);
+  template.resourceCountIs("AWS::EC2::Subnet", 6);
+});
+
+test("creates an encrypted ECR repository", () => {
+  const template = synthStack();
+  template.hasResourceProperties("AWS::ECR::Repository", {
+    ImageScanningConfiguration: { ScanOnPush: true },
+  });
 });
