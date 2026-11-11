@@ -1,32 +1,21 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": [
-      "es2022"
-    ],
-    "declaration": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": false,
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": false,
-    "skipLibCheck": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
-  },
-  "exclude": [
-    "node_modules",
-    "cdk.out"
+  // Solution file for the monorepo. `npx tsc -b` (or `npm run build`) from the
+  // repo root builds every project below, in dependency order.
+  //
+  // - List EVERY package/app here so a root build includes it. The order of
+  //   this list doesn't matter.
+  // - Build order comes from each project's OWN "references": apps/infra
+  //   references the four packages, so they always build before it. If a
+  //   package starts importing another package, add a reference to it in that
+  //   package's tsconfig.json, e.g. "references": [{ "path": "../ecr" }].
+  //   Otherwise a clean build can compile it before its dependency and fail.
+  // - Every referenced project must set "composite": true.
+  "files": [],
+  "references": [
+    { "path": "packages/network" },
+    { "path": "packages/eks-cluster" },
+    { "path": "packages/ecr" },
+    { "path": "packages/workloads" },
+    { "path": "apps/infra" }
   ]
 }

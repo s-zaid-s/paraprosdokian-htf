@@ -2,8 +2,8 @@ import * as cdk from "aws-cdk-lib/core";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { ParaprosdokianHtfStack } from "../lib/paraprosdokian-htf-stack";
 
-function synthStack(): Template {
-  const app = new cdk.App();
+function synthStack(context?: Record<string, unknown>): Template {
+  const app = new cdk.App({ context });
   // Environment-agnostic: avoids live AWS AZ-lookup calls during synth/tests.
   const stack = new ParaprosdokianHtfStack(app, "MyTestStack");
   return Template.fromStack(stack);
@@ -34,5 +34,32 @@ test("creates an encrypted ECR repository", () => {
   const template = synthStack();
   template.hasResourceProperties("AWS::ECR::Repository", {
     ImageScanningConfiguration: { ScanOnPush: true },
+  });
+});
+
+describe("allowedPublicEndpointCidrs context", () => {
+  const publicAccessCidrs = (template: Template) => {
+    const [cluster] = Object.values(
+      template.findResources("Custom::AWSCDK-EKS-Cluster"),
+    );
+    return cluster.Properties.Config.resourcesVpcConfig.publicAccessCidrs;
+  };
+
+  test.each([
+    ["a JSON array (cdk.json)", ["203.0.113.0/24", "198.51.100.0/24"]],
+    ["a JSON string (cdk -c)", '["203.0.113.0/24", "198.51.100.0/24"]'],
+    ["a comma-separated string (cdk -c)", "203.0.113.0/24,198.51.100.0/24"],
+  ])("accepts %s", (_, value) => {
+    const template = synthStack({ allowedPublicEndpointCidrs: value });
+    expect(publicAccessCidrs(template)).toEqual([
+      "203.0.113.0/24",
+      "198.51.100.0/24",
+    ]);
+  });
+
+  test("rejects values that are not a list of strings", () => {
+    expect(() => synthStack({ allowedPublicEndpointCidrs: "[1, 2]" })).toThrow(
+      /must be a list of strings/,
+    );
   });
 });

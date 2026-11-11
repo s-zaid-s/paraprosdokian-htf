@@ -1,5 +1,6 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/paraprosdokian-htf.ts",
+  "app": "node --enable-source-maps dist/bin/paraprosdokian-htf.js",
+  "build": "npm run build",
   "watch": {
     "include": [
       "**"
@@ -7,6 +8,7 @@
     "exclude": [
       "README.md",
       "cdk*.json",
+      "dist",
       "**/*.d.ts",
       "**/*.js",
       "tsconfig.json",

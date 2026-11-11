@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "bin",
+    "lib"
+  ],
+  "references": [
+    {
+      "path": "../../packages/network"
+    },
+    {
+      "path": "../../packages/eks-cluster"
+    },
+    {
+      "path": "../../packages/ecr"
+    },
+    {
+      "path": "../../packages/workloads"
+    }
+  ]
+}

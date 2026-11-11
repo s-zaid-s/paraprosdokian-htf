@@ -2,7 +2,13 @@ import * as eks from "aws-cdk-lib/aws-eks";
 import { Construct } from "constructs";
 
 export interface BackendWorkloadConstructProps {
-  readonly cluster: eks.Cluster;
+  /**
+   * Cluster to deploy onto. Only `addManifest` is used, so any `ICluster`
+   * works: the cluster created by `@paraprosdokian-htf/eks-cluster`, or an
+   * existing one imported with `eks.Cluster.fromClusterAttributes` (e.g. from
+   * a separate workloads stack).
+   */
+  readonly cluster: eks.ICluster;
   readonly namespace?: string;
   /** Image to run until the firm pushes its own build to the ECR repo. */
   readonly placeholderImage?: string;

@@ -1,0 +1,33 @@
+{
+  "name": "@paraprosdokian-htf/workloads",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kubernetes workloads deployed onto the EKS cluster (backend API namespace, deployment, service, ingress, HPA, PDB).",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "watch": "tsc -b -w",
+    "test": "npm run typecheck && jest",
+    "typecheck": "tsc -p test"
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.239.0",
+    "constructs": "^10.8.1"
+  },
+  "devDependencies": {
+    "@aws-cdk/lambda-layer-kubectl-v32": "^2.1.0",
+    "aws-cdk-lib": "^2.239.0",
+    "constructs": "^10.8.1"
+  }
+}
