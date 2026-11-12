@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib/core";
+import * as eks from "aws-cdk-lib/aws-eks";
 import { Construct } from "constructs";
 import { NetworkConstruct } from "@paraprosdokian-htf/network";
 import { EksClusterConstruct } from "@paraprosdokian-htf/eks-cluster";
@@ -17,14 +18,14 @@ export class ParaprosdokianHtfStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const clusterName: string =
-      this.node.tryGetContext("clusterName") ?? "paraprosdokian-htf";
+    const clusterName: string = this.node.tryGetContext("clusterName") ?? "paraprosdokian-htf";
     const allowedPublicEndpointCidrs = parseStringListContext(
       this.node.tryGetContext("allowedPublicEndpointCidrs"),
       "allowedPublicEndpointCidrs",
     );
-    const clusterAdminPrincipalArn: string | undefined =
-      this.node.tryGetContext("clusterAdminPrincipalArn");
+    const clusterAdminPrincipalArn: string | undefined = this.node.tryGetContext(
+      "clusterAdminPrincipalArn",
+    );
 
     const network = new NetworkConstruct(this, "Network", {
       maxAzs: 3,
@@ -43,7 +44,11 @@ export class ParaprosdokianHtfStack extends cdk.Stack {
     });
 
     new BackendWorkloadConstruct(this, "BackendWorkload", {
-      cluster: eksCluster.cluster,
+      // `as eks.ICluster`: aws-cdk-lib's concrete `Cluster` and `ICluster`
+      // disagree on `eksPodIdentityAgent`'s optionality, which only matters
+      // under `exactOptionalPropertyTypes` (same class of issue as the
+      // `Vpc`/`IVpc` fix in NetworkConstruct - see ADR 0001).
+      cluster: eksCluster.cluster as eks.ICluster,
     });
 
     new cdk.CfnOutput(this, "VpcId", { value: network.vpc.vpcId });
@@ -77,7 +82,10 @@ function parseStringListContext(value: unknown, key: string): string[] {
     const trimmed = value.trim();
     list = trimmed.startsWith("[")
       ? JSON.parse(trimmed)
-      : trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+      : trimmed
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
   }
   if (!Array.isArray(list) || !list.every((item) => typeof item === "string")) {
     throw new Error(

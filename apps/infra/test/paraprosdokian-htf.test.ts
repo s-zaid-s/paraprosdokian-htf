@@ -3,7 +3,10 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { ParaprosdokianHtfStack } from "../lib/paraprosdokian-htf-stack";
 
 function synthStack(context?: Record<string, unknown>): Template {
-  const app = new cdk.App({ context });
+  // Omit the key entirely when absent, rather than passing `context:
+  // undefined` (AppProps.context isn't `| undefined`-typed, so
+  // `exactOptionalPropertyTypes` rejects an explicit `undefined`).
+  const app = new cdk.App(context !== undefined ? { context } : {});
   // Environment-agnostic: avoids live AWS AZ-lookup calls during synth/tests.
   const stack = new ParaprosdokianHtfStack(app, "MyTestStack");
   return Template.fromStack(stack);
@@ -39,9 +42,8 @@ test("creates an encrypted ECR repository", () => {
 
 describe("allowedPublicEndpointCidrs context", () => {
   const publicAccessCidrs = (template: Template) => {
-    const [cluster] = Object.values(
-      template.findResources("Custom::AWSCDK-EKS-Cluster"),
-    );
+    const [cluster] = Object.values(template.findResources("Custom::AWSCDK-EKS-Cluster"));
+    if (!cluster) throw new Error("expected exactly one EKS cluster resource");
     return cluster.Properties.Config.resourcesVpcConfig.publicAccessCidrs;
   };
 
@@ -51,10 +53,7 @@ describe("allowedPublicEndpointCidrs context", () => {
     ["a comma-separated string (cdk -c)", "203.0.113.0/24,198.51.100.0/24"],
   ])("accepts %s", (_, value) => {
     const template = synthStack({ allowedPublicEndpointCidrs: value });
-    expect(publicAccessCidrs(template)).toEqual([
-      "203.0.113.0/24",
-      "198.51.100.0/24",
-    ]);
+    expect(publicAccessCidrs(template)).toEqual(["203.0.113.0/24", "198.51.100.0/24"]);
   });
 
   test("rejects values that are not a list of strings", () => {

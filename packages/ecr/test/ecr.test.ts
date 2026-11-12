@@ -28,9 +28,8 @@ test("expires untagged images and caps tagged image count", () => {
   const template = synth();
   const repos = template.findResources("AWS::ECR::Repository");
   const [repo] = Object.values(repos);
-  const policy = JSON.parse(
-    repo.Properties.LifecyclePolicy.LifecyclePolicyText,
-  );
+  if (!repo) throw new Error("expected exactly one ECR repository resource");
+  const policy = JSON.parse(repo.Properties.LifecyclePolicy.LifecyclePolicyText);
   expect(policy.rules).toEqual([
     expect.objectContaining({
       selection: expect.objectContaining({

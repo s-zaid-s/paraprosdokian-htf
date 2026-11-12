@@ -6,10 +6,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "include": [
-    "bin",
-    "lib"
-  ],
+  "include": ["bin", "lib"],
   "references": [
     {
       "path": "../../packages/network"

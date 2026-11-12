@@ -1,8 +1,10 @@
-*.js
-!jest.config.js
-*.d.ts
+# Compiled output: each package/app builds into its own dist/ via `tsc -b`.
+dist/
+*.tsbuildinfo
 node_modules
 
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+
+roadmap.md

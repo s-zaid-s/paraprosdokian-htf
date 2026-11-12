@@ -4,13 +4,7 @@
     "composite": false,
     "noEmit": true,
     "rootDir": "..",
-    "types": [
-      "node",
-      "jest"
-    ]
+    "types": ["node", "jest"]
   },
-  "include": [
-    ".",
-    "../src"
-  ]
+  "include": [".", "../src"]
 }

@@ -3,14 +3,17 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { EksClusterConstruct, EksClusterConstructProps } from "../src";
 
-function synth(
-  props: Partial<EksClusterConstructProps> = {},
-): Template {
+function synth(props: Partial<EksClusterConstructProps> = {}): Template {
   const stack = new Stack(new App(), "TestStack");
-  const vpc = new ec2.Vpc(stack, "Vpc");
+  // `as ec2.IVpc`: see ADR 0001 (Vpc/IVpc + exactOptionalPropertyTypes).
+  const vpc = new ec2.Vpc(stack, "Vpc") as ec2.IVpc;
   new EksClusterConstruct(stack, "EksCluster", {
     vpc,
     clusterName: "test-cluster",
+    // Listed explicitly (not just left to `...props`): it's a required key
+    // on `EksClusterConstructProps` (`string | undefined`, not `?:`), and
+    // spreading a `Partial<...>` can't guarantee a required key is present.
+    clusterAdminPrincipalArn: undefined,
     ...props,
   });
   return Template.fromStack(stack);
@@ -27,9 +30,7 @@ test("creates the cluster with secrets encryption and full audit logging", () =>
     Config: Match.objectLike({
       name: "test-cluster",
       version: "1.32",
-      encryptionConfig: [
-        Match.objectLike({ resources: ["secrets"] }),
-      ],
+      encryptionConfig: [Match.objectLike({ resources: ["secrets"] })],
       logging: {
         clusterLogging: [
           Match.objectLike({
@@ -77,11 +78,7 @@ test("installs the EKS-managed core addons", () => {
 });
 
 test("installs Cluster Autoscaler, metrics-server and the ALB controller", () => {
-  for (const chart of [
-    "cluster-autoscaler",
-    "metrics-server",
-    "aws-load-balancer-controller",
-  ]) {
+  for (const chart of ["cluster-autoscaler", "metrics-server", "aws-load-balancer-controller"]) {
     template.hasResourceProperties("Custom::AWSCDK-EKS-HelmChart", {
       Chart: chart,
     });
@@ -100,7 +97,7 @@ test("grants cluster-admin access to the configured principal", () => {
     Properties: { PrincipalArn: principalArn },
   });
   const [entry] = Object.values(entries);
-  expect(entry).toBeDefined();
+  if (!entry) throw new Error("expected exactly one matching access entry");
   // PolicyArn is a partition-aware Fn::Join, so match on its serialized form.
   expect(JSON.stringify(entry.Properties.AccessPolicies)).toContain(
     ":eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy",

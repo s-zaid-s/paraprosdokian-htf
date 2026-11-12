@@ -29,7 +29,12 @@ export interface NetworkConstructProps {
  * / isolated) with flow logs enabled for security auditing.
  */
 export class NetworkConstruct extends Construct {
-  public readonly vpc: ec2.Vpc;
+  // Typed as the interface, not the concrete class: `ec2.Vpc` declares
+  // `vpnGatewayId` as `string | undefined` while `ec2.IVpc` declares it
+  // optional (`vpnGatewayId?: string`), which `exactOptionalPropertyTypes`
+  // treats as incompatible. Exposing the interface type here fixes every
+  // downstream consumer at the one place the mismatch actually originates.
+  public readonly vpc: ec2.IVpc;
   public readonly flowLogGroup: logs.LogGroup;
 
   constructor(scope: Construct, id: string, props: NetworkConstructProps = {}) {
@@ -62,7 +67,9 @@ export class NetworkConstruct extends Construct {
           cidrMask: 24,
         },
       ],
-    });
+      // `as ec2.IVpc`: aws-cdk-lib's `Vpc.vpnGatewayId` is typed wider than
+      // `IVpc.vpnGatewayId`, which only matters under `exactOptionalPropertyTypes`.
+    }) as ec2.IVpc;
 
     // VPC flow logs give an auditable network trail, important for a
     // regulated trading firm's security/compliance posture.
@@ -77,10 +84,7 @@ export class NetworkConstruct extends Construct {
 
     new ec2.FlowLog(this, "FlowLog", {
       resourceType: ec2.FlowLogResourceType.fromVpc(this.vpc),
-      destination: ec2.FlowLogDestination.toCloudWatchLogs(
-        this.flowLogGroup,
-        flowLogRole,
-      ),
+      destination: ec2.FlowLogDestination.toCloudWatchLogs(this.flowLogGroup, flowLogRole),
       trafficType: ec2.FlowLogTrafficType.ALL,
       maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
     });
@@ -92,16 +96,11 @@ export class NetworkConstruct extends Construct {
 
     // Interface endpoints keep control-plane/API traffic off the public internet
     // even when nodes/pods call these services from private subnets.
-    const interfaceServices: Array<
-      [string, ec2.InterfaceVpcEndpointAwsService]
-    > = [
+    const interfaceServices: Array<[string, ec2.InterfaceVpcEndpointAwsService]> = [
       ["EcrApiEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR],
       ["EcrDkrEndpoint", ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER],
       ["StsEndpoint", ec2.InterfaceVpcEndpointAwsService.STS],
-      [
-        "CloudWatchLogsEndpoint",
-        ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      ],
+      ["CloudWatchLogsEndpoint", ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS],
       ["EksEndpoint", ec2.InterfaceVpcEndpointAwsService.EKS],
     ];
     for (const [id2, service] of interfaceServices) {

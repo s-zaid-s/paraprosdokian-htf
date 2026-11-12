@@ -27,9 +27,7 @@ test("creates public, private-with-egress and isolated subnets per AZ", () => {
   template.resourceCountIs("AWS::EC2::Subnet", 6);
   for (const tier of ["public", "private-eks", "isolated-data"]) {
     template.hasResourceProperties("AWS::EC2::Subnet", {
-      Tags: Match.arrayWith([
-        { Key: "aws-cdk:subnet-name", Value: tier },
-      ]),
+      Tags: Match.arrayWith([{ Key: "aws-cdk:subnet-name", Value: tier }]),
     });
   }
 });

@@ -22,11 +22,7 @@ export interface BackendWorkloadConstructProps {
  * placeholder image for a real one pushed to the ECR repository.
  */
 export class BackendWorkloadConstruct extends Construct {
-  constructor(
-    scope: Construct,
-    id: string,
-    props: BackendWorkloadConstructProps,
-  ) {
+  constructor(scope: Construct, id: string, props: BackendWorkloadConstructProps) {
     super(scope, id);
 
     const namespace = props.namespace ?? "backend";

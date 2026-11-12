@@ -17,12 +17,25 @@
     "synth": "npm run cdk -- synth",
     "diff": "npm run cdk -- diff",
     "deploy": "npm run cdk -- deploy",
-    "typecheck": "tsc -b && npm run typecheck --workspaces --silent"
+    "typecheck": "tsc -b && npm run typecheck --workspaces --silent",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:ci": "npm run lint && npm run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check:config-versions": "node scripts/check-config-versions.js",
+    "check:tsconfig-overrides": "node scripts/check-tsconfig-overrides.js"
   },
   "devDependencies": {
+    "@htf/config-eslint": "^0.1.0",
+    "@htf/config-prettier": "^0.1.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.19.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
     "jest": "^29.7.0",
+    "prettier": "^3.0.0",
     "ts-jest": "^29.2.5",
     "typescript": "~5.9.3"
   }

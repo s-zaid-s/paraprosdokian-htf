@@ -1,0 +1,13 @@
+{
+  "name": "@htf/config-prettier",
+  "version": "0.1.0",
+  "description": "Shared Prettier config for all packages in the paraprosdokian-htf monorepo.",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "CHANGELOG.md"
+  ],
+  "peerDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

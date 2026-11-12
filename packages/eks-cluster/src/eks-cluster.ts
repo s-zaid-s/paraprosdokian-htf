@@ -30,7 +30,10 @@ export interface EksClusterConstructProps {
    * granted and only the CDK deploy role can manage the cluster.
    * @default - none
    */
-  readonly clusterAdminPrincipalArn?: string;
+  // Not `?:` - the caller always passes this key (possibly `undefined`),
+  // so under `exactOptionalPropertyTypes` it must be a required field whose
+  // value can be `undefined`, not an optional field that must be omitted.
+  readonly clusterAdminPrincipalArn: string | undefined;
   readonly systemInstanceType?: ec2.InstanceType;
   readonly appInstanceType?: ec2.InstanceType;
   readonly systemNodeGroupScaling?: NodeGroupScaling;
@@ -97,15 +100,11 @@ export class EksClusterConstruct extends Construct {
     });
 
     if (props.clusterAdminPrincipalArn) {
-      this.cluster.grantAccess(
-        "ClusterAdminAccess",
-        props.clusterAdminPrincipalArn,
-        [
-          eks.AccessPolicy.fromAccessPolicyName("AmazonEKSClusterAdminPolicy", {
-            accessScopeType: eks.AccessScopeType.CLUSTER,
-          }),
-        ],
-      );
+      this.cluster.grantAccess("ClusterAdminAccess", props.clusterAdminPrincipalArn, [
+        eks.AccessPolicy.fromAccessPolicyName("AmazonEKSClusterAdminPolicy", {
+          accessScopeType: eks.AccessScopeType.CLUSTER,
+        }),
+      ]);
     }
 
     this.systemNodeGroup = this.addManagedNodeGroup("SystemNodeGroup", {
@@ -149,12 +148,8 @@ export class EksClusterConstruct extends Construct {
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEKSWorkerNodePolicy"),
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEKS_CNI_Policy"),
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonEC2ContainerRegistryReadOnly",
-        ),
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonSSMManagedInstanceCore",
-        ),
+        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonEC2ContainerRegistryReadOnly"),
+        iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"),
       ],
     });
 
@@ -202,17 +197,12 @@ export class EksClusterConstruct extends Construct {
     // CoreDNS pods need somewhere to schedule.
     coreDns.node.addDependency(this.systemNodeGroup);
 
-    const ebsCsiServiceAccount = this.cluster.addServiceAccount(
-      "EbsCsiServiceAccount",
-      {
-        name: "ebs-csi-controller-sa",
-        namespace: "kube-system",
-      },
-    );
+    const ebsCsiServiceAccount = this.cluster.addServiceAccount("EbsCsiServiceAccount", {
+      name: "ebs-csi-controller-sa",
+      namespace: "kube-system",
+    });
     ebsCsiServiceAccount.role.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName(
-        "service-role/AmazonEBSCSIDriverPolicy",
-      ),
+      iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AmazonEBSCSIDriverPolicy"),
     );
     const ebsCsi = new eks.CfnAddon(this, "EbsCsiAddon", {
       addonName: "aws-ebs-csi-driver",
@@ -228,13 +218,10 @@ export class EksClusterConstruct extends Construct {
 
   /** Cluster Autoscaler lets the managed node groups react to pending pods. */
   private installClusterAutoscaler(region: string): void {
-    const serviceAccount = this.cluster.addServiceAccount(
-      "ClusterAutoscalerServiceAccount",
-      {
-        name: "cluster-autoscaler",
-        namespace: "kube-system",
-      },
-    );
+    const serviceAccount = this.cluster.addServiceAccount("ClusterAutoscalerServiceAccount", {
+      name: "cluster-autoscaler",
+      namespace: "kube-system",
+    });
 
     serviceAccount.addToPrincipalPolicy(
       new iam.PolicyStatement({
