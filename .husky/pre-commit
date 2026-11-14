@@ -1,0 +1,19 @@
+# Lints and formats staged files (see lint-staged.config.mjs).
+# Escape hatch: `git commit --no-verify`. See "Skipping hooks" in README.md first.
+
+# Run the project's own pinned lint-staged, not `npx lint-staged`. If the local
+# copy is missing, npx silently runs whatever version it has cached or downloads
+# from the registry. `npx --no` only blocks the download, not the cached copy.
+lint_staged=node_modules/.bin/lint-staged
+if [ ! -x "$lint_staged" ]; then
+  echo "pre-commit: lint-staged isn't installed. Run 'npm ci' (or 'npm install'), then commit again." >&2
+  exit 1
+fi
+
+if ! "$lint_staged"; then
+  echo "" >&2
+  echo "pre-commit: commit aborted. Fix the errors above (your changes are untouched)." >&2
+  echo "pre-commit: to bypass in an exceptional case, use 'git commit --no-verify'. CI runs the same checks," >&2
+  echo "pre-commit: so the PR will still fail until they pass. See \"Skipping hooks\" in README.md." >&2
+  exit 1
+fi

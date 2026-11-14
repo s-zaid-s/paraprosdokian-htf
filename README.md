@@ -1,5 +1,7 @@
 # paraprosdokian-htf
 
+[![CI](https://github.com/s-zaid-s/paraprosdokian-htf/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/s-zaid-s/paraprosdokian-htf/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+
 This is an AWS CDK (TypeScript) monorepo that provisions an Amazon EKS cluster to serve as the backend platform
 for a high-frequency trading operation.
 
@@ -106,6 +108,7 @@ npm run deploy -- -c clusterAdminPrincipalArn=arn:aws:iam::111111111111:user/ali
 
 ## Deploying
 
+Use the Node.js version pinned in `.nvmrc` (CI uses the same file); `nvm use` or `fnm use` picks it up.
 All commands below run from the repository root. The root `cdk`/`synth`/`diff`/`deploy` scripts forward to the
 CDK CLI inside `apps/infra`. Anything after `--` is passed straight to `cdk`.
 
@@ -153,19 +156,158 @@ From the repository root:
 - `npm run synth` emit the synthesized CloudFormation template
 - `npm run diff` compare the deployed stack with the current state
 - `npm run deploy` deploy the stack to your default AWS account/region
+- `npm run snapshot:check` synthesize and fail if the templates differ from the committed snapshot (see below)
+- `npm run snapshot:update` synthesize and overwrite the committed snapshot
 
 Targeting a single workspace:
 
 - `npm test -w @paraprosdokian-htf/eks-cluster` test one package
 - `npx jest packages/network` run one package's tests from the root (after `npm run build`)
 
-Tests only transpile TypeScript; the `typecheck` step (part of `npm test`) handles type errors. Type-checking
-inside Jest re-loads the `aws-cdk-lib` type definitions for every test file, which grows memory by about 450 MB
-per file and can run out of memory on small CI runners.
+Tests only transpile TypeScript; the `typecheck` step (part of `npm test`) handles type errors. It checks every
+workspace's tests in a single `tsc --build` process (`scripts/typecheck-tests.js`), so `aws-cdk-lib`'s type definitions
+are parsed once rather than once per workspace. Type-checking inside Jest re-loads the `aws-cdk-lib` type definitions
+for every test file, which grows memory by about 450 MB per file and can run out of memory on small CI runners.
 
 `cdk watch` only watches files inside `apps/infra` (the CDK CLI limits watching to the directory that holds
 `cdk.json`). Edits under `packages/` are picked up by the next `cdk synth/diff/deploy`, but they won't trigger
 a watch cycle on their own.
+
+## Git hooks
+
+`npm install` (or `npm ci`) sets up two hooks with [husky](https://typicode.github.io/husky/), via the root
+`postinstall` script (`.husky/install.mjs`). There's no separate setup step. If dev dependencies are omitted
+(`--omit=dev`, `NODE_ENV=production`) or there's no `.git` directory, the install still succeeds and just skips the hooks.
+
+If you install with `--ignore-scripts`, or have `ignore-scripts=true` in your npm config (check with
+`npm config get ignore-scripts`), npm skips `postinstall` and the hooks are **not** set up, without any warning.
+Set them up once by hand after installing:
+
+```sh
+node .husky/install.mjs
+```
+
+This only needs to be done once per clone. It's safe to rerun, and it runs only husky's setup, not any dependency's
+install scripts.
+
+**pre-commit:** on each `git commit`, [lint-staged](https://github.com/lint-staged/lint-staged) runs on the
+**staged** files only:
+
+- `*.ts`: `eslint --fix`, then `prettier --write`
+- everything else Prettier can format: `prettier --write`
+
+Fixes are added to the commit automatically. If an error can't be auto-fixed (e.g. `no-explicit-any`), the commit
+is aborted and your changes are left as they were. Files listed in `.prettierignore` are never reformatted, including
+the byte-exact `apps/infra/snapshot/`. The config lives in `lint-staged.config.mjs`.
+
+**pre-push:** on each `git push`, `npm test` runs for the whole monorepo (every workspace's type-check and Jest
+suite, about 1-2 minutes). A failure blocks the push. Pushes that only delete remote branches skip the tests. The tests
+run against your **working tree**, so the hook warns when that isn't what you're pushing: when you have uncommitted
+changes, or are pushing a branch other than the one checked out.
+
+### Skipping hooks (`--no-verify`)
+
+> [!WARNING]
+> Skipping a hook doesn't skip the check. CI runs lint, formatting, type-checks, every test and the synth snapshot
+> check on every PR, so anything a hook would have caught still fails there, just later and in front of reviewers.
+> Use the escape hatch to get unblocked, not to get code merged.
+
+| To skip                           | Use                                                    |
+| --------------------------------- | ------------------------------------------------------ |
+| pre-commit, for one commit        | `git commit --no-verify` (or `git commit -n`)          |
+| pre-push, for one push            | `git push --no-verify`                                 |
+| both hooks, for the whole session | `export HUSKY=0` (remember to `unset HUSKY` afterward) |
+
+**Don't use `git push -n`:** for `push`, `-n` means `--dry-run`, not `--no-verify`. The hook still runs the full test
+suite, and then nothing is pushed.
+
+**Reasonable reasons to skip:**
+
+- **Saving or sharing work in progress on your own branch.** A WIP commit you'll squash later, or a push to back up
+  your work or to show someone a failing test. Open the PR as a draft until the checks pass.
+- **The hook is broken, not your code.** For example, a tool crashes or your environment can't run it. Skip once, then
+  fix the hook or report the problem, so skipping doesn't become a habit.
+- **You've just run the same checks yourself.** For example, `npm test` on exactly the commit you're pushing, with a
+  clean working tree. Running the pre-push tests again adds nothing.
+
+**Don't skip:**
+
+- **To get failing tests, lint errors or unformatted code into a PR you intend to merge.** CI will reject it anyway.
+  Skipping pre-commit also leaves the file unformatted, and lint-staged formats whole files. The next person to touch
+  that file then gets your formatting fixes in their diff.
+- **When pushing to `main` or a release branch.** CI on `main` runs only after the code has landed.
+- **Because the hooks feel slow.** Say so instead, so they can be made faster. Routinely skipping them makes them
+  useless for everyone.
+
+**After skipping,** run the checks yourself before you mark the PR ready for review:
+
+```sh
+npm run lint && npm run format:check && npm test && npm run snapshot:check
+```
+
+Hooks run on your machine, and nothing can stop `--no-verify`. The real gate is CI. Make sure the CI job
+(`Install, build, lint, test, synth`) is a **required status check** for `main` in the repository's branch protection
+settings. Then no skipped hook can get failing code merged.
+
+## Synth snapshot (drift detection)
+
+`apps/infra/snapshot/` holds the CloudFormation templates that `cdk synth` produces for the app. CI runs
+`npm run snapshot:check` on every PR and fails if the current synth output differs from them. Any change to the
+synthesized infrastructure, whether from our code, a context value or a dependency bump, must therefore update the
+snapshot in the same PR. Reviewers then see the exact template diff next to the code that caused it.
+
+When the check fails and the change is intended:
+
+```sh
+npm run snapshot:update
+git add apps/infra/snapshot
+```
+
+CI also uploads the templates it synthesized as a `synth-snapshot` artifact on the failed run. They are identical to what
+`snapshot:update` writes.
+
+The snapshot doesn't depend on who runs it. `scripts/synth-snapshot.js` synthesizes with your AWS credentials hidden,
+for the account/region whose lookups are cached in `apps/infra/cdk.context.json`, with `--no-lookups` (no AWS calls).
+It also leaves out the `AWS::CDK::Metadata` resource, which changes on every CDK version bump. Some dependency bumps
+still change the snapshot, for example when a new `aws-cdk-lib` ships updated custom-resource Lambda code (new asset
+hashes) or runtimes. That is a real change to what gets deployed, so commit it with the bump. For Dependabot's PRs
+this happens automatically (see below).
+
+## Dependency updates
+
+[Dependabot](.github/dependabot.yml) opens update PRs every Monday, for npm packages and for the GitHub Actions used
+in CI:
+
+- **Grouping:**
+  - one PR per CDK release (`aws-cdk-lib`, the `aws-cdk` CLI, `constructs` and `@aws-cdk/*`);
+  - one PR for all other minor and patch updates;
+  - one PR per major update, so each breaking change is reviewed on its own.
+- **Cooldown:** a release is proposed only after it has been public for 3 days, so a compromised or broken version is
+  usually pulled before it reaches a PR. Security updates aren't delayed.
+- **Never updated:** the internal `@htf/*` and `@paraprosdokian-htf/*` workspace packages, so they always resolve to
+  the local copy. Major versions of `@types/node` are also skipped; bump them by hand together with `.nvmrc`.
+
+**Snapshot updates.** A dependency update can change the synthesized templates, for example a new Lambda runtime or new
+`kubectl`/`helm` versions in the EKS Lambda layer, so Dependabot's PR would fail the snapshot drift check. For
+Dependabot's npm PRs, the
+[Dependabot snapshot update](.github/workflows/dependabot-snapshot.yml) workflow regenerates `apps/infra/snapshot/`,
+commits it to the PR as `github-actions[bot]`, and starts CI on that commit. Expect the first CI run on Dependabot's
+own commit to fail the drift check; the run on the snapshot commit is the one that counts.
+
+The workflow is split into two jobs so the updated dependencies' code never runs with write access:
+
+- **Synthesize snapshot:** installs the dependencies and synthesizes the templates, with a read-only token.
+- **Commit snapshot to the PR:** runs no npm code. It accepts only well-formed `*.template.json` files from the first
+  job, then commits and pushes them.
+
+**Reviewing these PRs:**
+
+- **Review the snapshot diff.** It shows exactly how the update changes what gets deployed (runtimes, binary
+  versions, asset hashes). Treat it like any other infrastructure change, and run `npm run diff` before deploying.
+- **Never auto-merge a PR that changes the snapshot.**
+- **If the PR falls behind `main`,** comment `@dependabot rebase`. The snapshot commit counts as an edit, so Dependabot
+  won't rebase on its own. A rebase replaces the branch, and the workflow then regenerates the snapshot.
+- **If you bump a CDK package yourself** (not via Dependabot), run `npm run snapshot:update` and commit the result.
 
 ## Adding a package
 

@@ -2,9 +2,14 @@
 // tool (consistent with scripts/check-config-versions.js) with no type
 // declarations of its own. It lives at the repo root (not in this package),
 // so the path climbs out of apps/infra/test back to the monorepo root.
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+
 const {
   getBaseFlags,
   findUndocumentedOverrides,
+  findConsumingTsconfigFiles,
 } = require("../../../scripts/check-tsconfig-overrides");
 
 describe("getBaseFlags", () => {
@@ -64,5 +69,41 @@ describe("findUndocumentedOverrides", () => {
     );
 
     expect(findUndocumentedOverrides(baseFlags, raw)).toEqual([]);
+  });
+});
+
+describe("findConsumingTsconfigFiles", () => {
+  it("covers every workspace in packages/ and apps/, including their test configs", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "tsconfig-overrides-"));
+    const touch = (relative: string) => {
+      fs.mkdirSync(path.dirname(path.join(root, relative)), { recursive: true });
+      fs.writeFileSync(path.join(root, relative), "{}");
+    };
+    for (const file of [
+      "tsconfig.json",
+      "tsconfig.base.json",
+      "packages/network/tsconfig.json",
+      "packages/network/test/tsconfig.json",
+      "packages/config-eslint/package.json",
+      "apps/infra/tsconfig.json",
+      "apps/infra/test/tsconfig.json",
+    ]) {
+      touch(file);
+    }
+
+    const found = findConsumingTsconfigFiles(root).map((file: string) => path.relative(root, file));
+
+    expect(found.sort()).toEqual(
+      [
+        "tsconfig.json",
+        "packages/network/tsconfig.json",
+        "packages/network/test/tsconfig.json",
+        "apps/infra/tsconfig.json",
+        "apps/infra/test/tsconfig.json",
+      ]
+        .map((file) => path.normalize(file))
+        .sort(),
+    );
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });

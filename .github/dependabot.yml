@@ -1,0 +1,46 @@
+# Automated dependency updates. See "Dependency updates" in README.md.
+version: 2
+updates:
+  - package-ecosystem: npm
+    # The root lockfile covers every workspace (packages/*, apps/*).
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Propose a release only once it has been public for a few days. A
+    # compromised or broken version is then usually caught and pulled before it
+    # reaches a PR. Security updates are not delayed.
+    cooldown:
+      default-days: 3
+    ignore:
+      # Internal workspace packages must always resolve to the local copy, never
+      # to a same-named package on the public registry (dependency confusion).
+      - dependency-name: "@htf/*"
+      - dependency-name: "@paraprosdokian-htf/*"
+      # Node's types follow the Node major version in .nvmrc. Bump both together
+      # by hand.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # One PR per CDK release: the library, the CLI and constructs move together.
+      # These change the synthesized templates, so the "Dependabot snapshot
+      # update" workflow commits the refreshed snapshot to the PR.
+      aws-cdk:
+        patterns: ["aws-cdk", "aws-cdk-lib", "constructs", "@aws-cdk/*"]
+      # Every other minor/patch update (dev tooling) in a single PR. Major
+      # updates still get one PR each, because they need individual review.
+      tooling:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    # Covers .github/workflows/*.
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      github-actions:
+        patterns: ["*"]

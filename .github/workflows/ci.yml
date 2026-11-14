@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  pull_request:
+  # Runs on main too, mainly to fill the cache. A cache saved by a PR run is only
+  # visible to that PR, but every PR can read caches saved on main. Without this,
+  # every new PR would start with a cold cache.
+  push:
+    branches: [main]
+  # Lets the "Dependabot snapshot update" workflow run CI on the commit it pushes.
+  # Pushes made with GITHUB_TOKEN don't trigger the events above.
+  workflow_dispatch:
+
+# Read-only token: this workflow only checks code, it never pushes or deploys.
+permissions:
+  contents: read
+
+# A new push to a PR cancels that PR's in-flight run. Runs on main are never
+# cancelled, so every merged commit is checked and fills the cache.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: Install, build, lint, test, synth
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # No `cache: npm` here: node_modules is cached directly below. setup-node's
+      # ~/.npm cache would be downloaded on every run, only to be unused whenever
+      # node_modules is restored.
+      - name: Set up Node.js
+        id: setup-node
+        uses: actions/setup-node@v5
+        with:
+          # Same Node version contributors use locally (`nvm use` reads it too).
+          node-version-file: .nvmrc
+
+      # Cache node_modules itself, not npm's download cache. Restoring it is much
+      # faster than `npm ci`, even with a warm ~/.npm. The key must match exactly,
+      # with no restore-keys, because `npm ci` deletes node_modules anyway. The key
+      # covers every package.json as well as the lockfile. Any dependency edit then
+      # misses the cache and reruns `npm ci`, which still fails if a package.json
+      # and the lockfile disagree.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-node${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('package-lock.json', 'package.json', 'packages/*/package.json', 'apps/*/package.json') }}
+
+      - name: Install
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      # Saved right after install rather than at the end of the job, so a PR that
+      # fails lint or tests still caches its dependencies for the next push.
+      - name: Save node_modules
+        if: steps.node-modules.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            apps/*/node_modules
+          key: ${{ steps.node-modules.outputs.cache-primary-key }}
+
+      # Restore the previous run's tsc -b output (dist/ plus tsconfig.tsbuildinfo).
+      # tsc -b compares .ts sources and dependency .d.ts files by content hash, so
+      # it rebuilds only the projects whose code changed. It compares tsconfig files
+      # by timestamp, though, and a fresh checkout makes them all look newer than
+      # the cache, which forces a full rebuild. The next step backdates them. That
+      # is only safe because the key below includes a hash of those same tsconfig
+      # files, so a cache built with different compiler options is never restored.
+      # (tsc does not otherwise notice a changed option.) Each run saves under a new
+      # key, and restore-keys picks the newest with the same tsconfigs: this PR's own
+      # last run, or else main's.
+      - name: Restore TypeScript build output
+        id: tsc-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            packages/*/dist
+            apps/*/dist
+          key: tsc-build-${{ runner.os }}-${{ hashFiles('tsconfig*.json', 'packages/*/tsconfig.json', 'apps/*/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-build-${{ runner.os }}-${{ hashFiles('tsconfig*.json', 'packages/*/tsconfig.json', 'apps/*/tsconfig.json') }}-
+
+      # Must list exactly the files hashed in the key above.
+      - name: Backdate tsconfig files to match restored build output
+        if: steps.tsc-cache.outputs.cache-matched-key != ''
+        run: touch -d @0 tsconfig*.json packages/*/tsconfig.json apps/*/tsconfig.json
+
+      # Loading aws-cdk-lib's type definitions dominates build time. Any project
+      # rebuild pays nearly the full cost, so the cache mostly helps pushes that
+      # change no source file (tests, docs, config) and reruns.
+      - name: Build
+        id: build
+        run: npm run build
+
+      # Saved straight after a successful build, before lint/test, for the same
+      # reason as node_modules. Later steps rerun tsc -b but change nothing.
+      - name: Save TypeScript build output
+        if: steps.tsc-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            packages/*/dist
+            apps/*/dist
+          key: ${{ steps.tsc-cache.outputs.cache-primary-key }}
+
+      # Each check below runs once the build has succeeded, even if an earlier
+      # check failed. One run then reports every problem (lint, tests, snapshot
+      # drift) instead of one per push. The job still fails if any check does.
+      - name: Lint
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run lint
+
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run format:check
+
+      - name: Check shared config versions
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run check:config-versions
+
+      - name: Check tsconfig strict-flag overrides
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run check:tsconfig-overrides
+
+      # Type-checks all sources and tests, then runs every workspace's Jest suite.
+      - name: Test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm test
+
+      # Runs `cdk synth` for apps/infra and fails if the templates differ from the
+      # snapshot committed in apps/infra/snapshot/. Any infrastructure change then
+      # needs `npm run snapshot:update` in the same PR, so reviewers see the
+      # CloudFormation diff. The script synthesizes without AWS credentials, for a
+      # pinned account/region whose lookups are cached in cdk.context.json (see
+      # scripts/synth-snapshot.js).
+      - name: CDK synth + snapshot drift check (apps/infra)
+        id: snapshot
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npm run snapshot:check
+
+      # On drift, upload the templates CI synthesized. They are exactly what
+      # `npm run snapshot:update` would write, so you can download them into
+      # apps/infra/snapshot/ instead of synthesizing locally.
+      - name: Upload synthesized templates
+        if: failure() && steps.snapshot.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synth-snapshot
+          path: apps/infra/cdk.out/*.template.json
+          if-no-files-found: ignore

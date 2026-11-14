@@ -1,0 +1,144 @@
+name: Dependabot snapshot update
+
+# Dependency updates, especially aws-cdk-lib, change the synthesized templates
+# (e.g. new asset hashes or Lambda runtimes), so Dependabot's PRs fail CI's
+# snapshot drift check. For Dependabot's npm PRs, this workflow regenerates
+# apps/infra/snapshot/ and commits it to the PR. Reviewers then see exactly how
+# the update changes what gets deployed. A human still reviews and merges every
+# PR: never auto-merge a PR that changes the snapshot. See "Dependency updates"
+# in README.md.
+
+on:
+  pull_request:
+
+# Each job requests only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  synth:
+    name: Synthesize snapshot
+    # Only Dependabot's npm PRs, and only from branches in this repository.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      startsWith(github.head_ref, 'dependabot/npm_and_yarn/') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # This job installs and runs the updated dependencies (install scripts,
+    # cdk synth), so it gets a read-only token. The commit job below holds the
+    # write token and runs no npm code.
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install
+        run: npm ci
+
+      - name: Regenerate snapshot
+        run: npm run snapshot:update
+
+      - name: Check for snapshot changes
+        id: diff
+        run: |
+          if git status --porcelain -- apps/infra/snapshot | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload snapshot
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synth-snapshot
+          path: apps/infra/snapshot/
+          retention-days: 1
+
+  commit:
+    name: Commit snapshot to the PR
+    needs: synth
+    if: needs.synth.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # push the snapshot commit to the Dependabot branch
+      actions: write # start CI for that commit (last step)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Exactly the commit that was synthesized. If Dependabot has pushed
+          # since, the push below is rejected, and the new push re-runs this
+          # workflow anyway.
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Download snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: synth-snapshot
+          path: ${{ runner.temp }}/snapshot
+
+      # The artifact was produced by code from the updated dependencies, so
+      # accept only well-formed CloudFormation templates into the snapshot
+      # directory.
+      - name: Validate and apply snapshot
+        env:
+          SNAPSHOT: ${{ runner.temp }}/snapshot
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=("$SNAPSHOT"/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::The snapshot artifact is empty."
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            name=$(basename "$file")
+            if [ ! -f "$file" ] || ! [[ "$name" =~ ^[A-Za-z0-9-]+(\.nested)?\.template\.json$ ]]; then
+              echo "::error::Unexpected entry in the snapshot artifact: $name"
+              exit 1
+            fi
+            if ! python3 -m json.tool "$file" > /dev/null; then
+              echo "::error::$name is not valid JSON."
+              exit 1
+            fi
+          done
+          mkdir -p apps/infra/snapshot
+          rm -f apps/infra/snapshot/*.template.json
+          cp "${files[@]}" apps/infra/snapshot/
+
+      - name: Commit and push
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A apps/infra/snapshot
+          git commit -m "Update synth snapshot for dependency update"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
+
+      # Pushes made with GITHUB_TOKEN don't trigger workflows, so CI would not
+      # run on the snapshot commit by itself. (This is also why this workflow
+      # can't retrigger itself.) workflow_dispatch is the documented exception.
+      - name: Run CI on the snapshot commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$HEAD_REF"

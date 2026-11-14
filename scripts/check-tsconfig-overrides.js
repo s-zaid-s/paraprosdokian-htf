@@ -43,14 +43,22 @@ function findUndocumentedOverrides(baseFlags, consumingConfigRaw) {
   return violations;
 }
 
-function findConsumingTsconfigFiles() {
-  const files = [path.join(ROOT, "tsconfig.json")];
-  const packagesDir = path.join(ROOT, "packages");
-  if (fs.existsSync(packagesDir)) {
-    for (const name of fs.readdirSync(packagesDir)) {
-      const tsconfigPath = path.join(packagesDir, name, "tsconfig.json");
-      if (fs.existsSync(tsconfigPath)) {
-        files.push(tsconfigPath);
+// Every workspace (packages/* and apps/*) can override the base in its own
+// tsconfig.json and in test/tsconfig.json (used to type-check its tests).
+const WORKSPACE_DIRS = ["packages", "apps"];
+const WORKSPACE_TSCONFIGS = ["tsconfig.json", path.join("test", "tsconfig.json")];
+
+function findConsumingTsconfigFiles(root = ROOT) {
+  const files = [path.join(root, "tsconfig.json")];
+  for (const workspaceDir of WORKSPACE_DIRS) {
+    const dir = path.join(root, workspaceDir);
+    if (!fs.existsSync(dir)) continue;
+    for (const name of fs.readdirSync(dir)) {
+      for (const tsconfig of WORKSPACE_TSCONFIGS) {
+        const tsconfigPath = path.join(dir, name, tsconfig);
+        if (fs.existsSync(tsconfigPath)) {
+          files.push(tsconfigPath);
+        }
       }
     }
   }
@@ -88,4 +96,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { getBaseFlags, findUndocumentedOverrides };
+module.exports = { getBaseFlags, findUndocumentedOverrides, findConsumingTsconfigFiles };

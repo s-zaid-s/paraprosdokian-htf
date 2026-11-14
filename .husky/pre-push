@@ -1,0 +1,46 @@
+# Runs the whole monorepo's tests (`npm test`: type-check every workspace and
+# its tests, then every Jest suite) before anything is pushed.
+# Escape hatch: `git push --no-verify` (NOT `-n`, which is --dry-run for push).
+# See "Skipping hooks" in README.md first.
+
+# Git writes one line per ref being pushed to stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# A deletion (`git push origin --delete branch`) has an all-zero local sha.
+head=$(git rev-parse HEAD)
+ref_count=0
+pushes_commits=false
+pushes_head=false
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  ref_count=$((ref_count + 1))
+  case "$local_sha" in
+    *[!0]*) pushes_commits=true ;;
+  esac
+  if [ "$local_sha" = "$head" ]; then pushes_head=true; fi
+done
+
+# Git runs the hook even when there is nothing to push ("Everything up-to-date").
+if [ "$ref_count" -eq 0 ]; then
+  exit 0
+fi
+
+if [ "$pushes_commits" = false ]; then
+  echo "pre-push: only deleting remote refs, skipping tests."
+  exit 0
+fi
+
+# Tests run against the working tree. Warn when that isn't what's being pushed,
+# so a pass or fail isn't mistaken for a verdict on the pushed commits.
+if ! git diff --quiet HEAD --; then
+  echo "pre-push: warning: uncommitted changes are included in this test run, but won't be pushed." >&2
+fi
+if [ "$pushes_head" = false ]; then
+  echo "pre-push: warning: you're not pushing the checked-out commit; tests run against the checked-out code." >&2
+fi
+
+if ! npm test; then
+  echo "" >&2
+  echo "pre-push: push aborted because tests failed." >&2
+  echo "pre-push: to bypass in an exceptional case, use 'git push --no-verify' (not -n, which is a dry run)." >&2
+  echo "pre-push: CI runs the same tests, so the PR will still fail. See \"Skipping hooks\" in README.md." >&2
+  exit 1
+fi

@@ -9,6 +9,7 @@
     "apps/*"
   ],
   "scripts": {
+    "postinstall": "node .husky/install.mjs",
     "build": "tsc -b",
     "watch": "tsc -b -w",
     "clean": "tsc -b --clean",
@@ -17,7 +18,9 @@
     "synth": "npm run cdk -- synth",
     "diff": "npm run cdk -- diff",
     "deploy": "npm run cdk -- deploy",
-    "typecheck": "tsc -b && npm run typecheck --workspaces --silent",
+    "snapshot:check": "node scripts/synth-snapshot.js --check",
+    "snapshot:update": "node scripts/synth-snapshot.js --update",
+    "typecheck": "tsc -b && node scripts/typecheck-tests.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:ci": "npm run lint && npm run typecheck",
@@ -34,7 +37,9 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.0.0",
     "ts-jest": "^29.2.5",
     "typescript": "~5.9.3"
