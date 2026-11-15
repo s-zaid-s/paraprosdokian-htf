@@ -7,7 +7,7 @@ import {
   ImageFailure,
   ImageIdentifier,
   paginateDescribeImages,
-} from '@aws-sdk/client-ecr';
+} from "@aws-sdk/client-ecr";
 
 /** Result of `EcrClient.batchGetImage`. */
 export interface BatchGetImageResult {
@@ -47,18 +47,28 @@ export class EcrClient implements IEcrClient {
 
   /** @param configOrClient SDK client config (region, credentials, ...) or an existing `ECRClient` to reuse. */
   constructor(configOrClient: ECRClientConfig | ECRClient = {}) {
-    this.client = configOrClient instanceof ECRClient ? configOrClient : new ECRClient(configOrClient);
+    this.client =
+      configOrClient instanceof ECRClient ? configOrClient : new ECRClient(configOrClient);
   }
 
-  public async describeImages(repositoryName: string, imageIds?: ImageIdentifier[]): Promise<ImageDetail[]> {
+  public async describeImages(
+    repositoryName: string,
+    imageIds?: ImageIdentifier[],
+  ): Promise<ImageDetail[]> {
     const details: ImageDetail[] = [];
-    for await (const page of paginateDescribeImages({ client: this.client }, { repositoryName, imageIds })) {
+    for await (const page of paginateDescribeImages(
+      { client: this.client },
+      { repositoryName, imageIds },
+    )) {
       details.push(...(page.imageDetails ?? []));
     }
     return details;
   }
 
-  public async batchGetImage(repositoryName: string, imageIds: ImageIdentifier[]): Promise<BatchGetImageResult> {
+  public async batchGetImage(
+    repositoryName: string,
+    imageIds: ImageIdentifier[],
+  ): Promise<BatchGetImageResult> {
     const output = await this.client.send(new BatchGetImageCommand({ repositoryName, imageIds }));
     return { images: output.images ?? [], failures: output.failures ?? [] };
   }

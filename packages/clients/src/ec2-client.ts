@@ -8,7 +8,7 @@ import {
   paginateDescribeVpcs,
   Subnet,
   Vpc,
-} from '@aws-sdk/client-ec2';
+} from "@aws-sdk/client-ec2";
 
 export interface DescribeVpcsOptions {
   /** Specific VPC IDs to describe. @default - all VPCs */
@@ -42,7 +42,9 @@ export interface IEc2Client {
   describeSubnets(options?: DescribeSubnetsOptions): Promise<Subnet[]>;
 
   /** Describes Availability Zones in the client's region. */
-  describeAvailabilityZones(options?: DescribeAvailabilityZonesOptions): Promise<AvailabilityZone[]>;
+  describeAvailabilityZones(
+    options?: DescribeAvailabilityZonesOptions,
+  ): Promise<AvailabilityZone[]>;
 }
 
 /** `IEc2Client` backed by the AWS SDK v3 `EC2Client`. */
@@ -51,7 +53,8 @@ export class Ec2Client implements IEc2Client {
 
   /** @param configOrClient SDK client config (region, credentials, ...) or an existing `EC2Client` to reuse. */
   constructor(configOrClient: EC2ClientConfig | EC2Client = {}) {
-    this.client = configOrClient instanceof EC2Client ? configOrClient : new EC2Client(configOrClient);
+    this.client =
+      configOrClient instanceof EC2Client ? configOrClient : new EC2Client(configOrClient);
   }
 
   public async describeVpcs(options: DescribeVpcsOptions = {}): Promise<Vpc[]> {
@@ -73,12 +76,16 @@ export class Ec2Client implements IEc2Client {
   }
 
   // Not paginated: the API returns all zones in a single response.
-  public async describeAvailabilityZones(options: DescribeAvailabilityZonesOptions = {}): Promise<AvailabilityZone[]> {
-    const { AvailabilityZones } = await this.client.send(new DescribeAvailabilityZonesCommand({
-      ZoneNames: options.zoneNames,
-      Filters: options.filters,
-      AllAvailabilityZones: options.allAvailabilityZones,
-    }));
+  public async describeAvailabilityZones(
+    options: DescribeAvailabilityZonesOptions = {},
+  ): Promise<AvailabilityZone[]> {
+    const { AvailabilityZones } = await this.client.send(
+      new DescribeAvailabilityZonesCommand({
+        ZoneNames: options.zoneNames,
+        Filters: options.filters,
+        AllAvailabilityZones: options.allAvailabilityZones,
+      }),
+    );
     return AvailabilityZones ?? [];
   }
 }

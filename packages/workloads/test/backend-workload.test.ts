@@ -3,6 +3,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as eks from "aws-cdk-lib/aws-eks";
 import { Template } from "aws-cdk-lib/assertions";
 import { KubectlV32Layer } from "@aws-cdk/lambda-layer-kubectl-v32";
+import { IWorkloadCluster } from "@paraprosdokian-htf/eks-cluster";
 import { BackendWorkloadConstruct, BackendWorkloadConstructProps } from "../src";
 
 type Manifest = {
@@ -14,8 +15,8 @@ type Manifest = {
 /** Synthesizes the workload onto a bare cluster and returns its manifests. */
 function synthManifests(props: Partial<BackendWorkloadConstructProps> = {}): Manifest[] {
   const stack = new Stack(new App(), "TestStack");
-  // `as ec2.IVpc`/`as eks.ICluster`: see ADR 0001 (exactOptionalPropertyTypes
-  // vs. aws-cdk-lib's concrete classes).
+  // `as ec2.IVpc`: see ADR 0001 (exactOptionalPropertyTypes vs.
+  // aws-cdk-lib's concrete classes).
   const cluster = new eks.Cluster(stack, "Cluster", {
     vpc: new ec2.Vpc(stack, "Vpc") as ec2.IVpc,
     version: eks.KubernetesVersion.V1_32,
@@ -23,7 +24,7 @@ function synthManifests(props: Partial<BackendWorkloadConstructProps> = {}): Man
     defaultCapacity: 0,
   });
   new BackendWorkloadConstruct(stack, "BackendWorkload", {
-    cluster: cluster as eks.ICluster,
+    cluster,
     ...props,
   });
 
@@ -131,4 +132,41 @@ test("can deploy onto an imported (existing) cluster", () => {
       "Service",
     ].sort(),
   );
+});
+
+/**
+ * Fake `IWorkloadCluster` used to unit-test `BackendWorkloadConstruct` without
+ * synthesizing (or needing) a real EKS cluster. It only records the manifest
+ * IDs it is asked to apply and returns a stub exposing `node.addDependency`,
+ * which is all the construct touches on the returned manifests.
+ */
+class FakeWorkloadCluster implements IWorkloadCluster {
+  public readonly clusterName = "fake-cluster";
+  public readonly appliedManifestIds: string[] = [];
+
+  public addManifest(id: string, ..._manifest: Record<string, unknown>[]): eks.KubernetesManifest {
+    this.appliedManifestIds.push(id);
+    return { node: { addDependency: (): void => undefined } } as unknown as eks.KubernetesManifest;
+  }
+
+  public addHelmChart(_id: string, _options: eks.HelmChartOptions): eks.HelmChart {
+    return { node: { addDependency: (): void => undefined } } as unknown as eks.HelmChart;
+  }
+}
+
+test("applies exactly the seven backend manifests against a fake cluster (no real EKS)", () => {
+  const fake = new FakeWorkloadCluster();
+  new BackendWorkloadConstruct(new Stack(new App(), "FakeClusterStack"), "BackendWorkload", {
+    cluster: fake,
+  });
+
+  expect(fake.appliedManifestIds).toEqual([
+    "BackendNamespace",
+    "BackendResourceQuota",
+    "BackendDeployment",
+    "BackendPdb",
+    "BackendService",
+    "BackendIngress",
+    "BackendHpa",
+  ]);
 });

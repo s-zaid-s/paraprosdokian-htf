@@ -1,4 +1,4 @@
-import { Cluster, DescribeClusterCommand, EKSClient, EKSClientConfig } from '@aws-sdk/client-eks';
+import { Cluster, DescribeClusterCommand, EKSClient, EKSClientConfig } from "@aws-sdk/client-eks";
 
 /** The EKS operations this repo uses. Depend on this rather than `EksClient`. */
 export interface IEksClient {
@@ -15,7 +15,8 @@ export class EksClient implements IEksClient {
 
   /** @param configOrClient SDK client config (region, credentials, ...) or an existing `EKSClient` to reuse. */
   constructor(configOrClient: EKSClientConfig | EKSClient = {}) {
-    this.client = configOrClient instanceof EKSClient ? configOrClient : new EKSClient(configOrClient);
+    this.client =
+      configOrClient instanceof EKSClient ? configOrClient : new EKSClient(configOrClient);
   }
 
   public async describeCluster(name: string): Promise<Cluster> {

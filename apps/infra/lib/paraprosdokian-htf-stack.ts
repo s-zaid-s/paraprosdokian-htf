@@ -1,5 +1,4 @@
 import * as cdk from "aws-cdk-lib/core";
-import * as eks from "aws-cdk-lib/aws-eks";
 import { Construct } from "constructs";
 import { NetworkConstruct } from "@paraprosdokian-htf/network";
 import { EksClusterConstruct } from "@paraprosdokian-htf/eks-cluster";
@@ -44,11 +43,10 @@ export class ParaprosdokianHtfStack extends cdk.Stack {
     });
 
     new BackendWorkloadConstruct(this, "BackendWorkload", {
-      // `as eks.ICluster`: aws-cdk-lib's concrete `Cluster` and `ICluster`
-      // disagree on `eksPodIdentityAgent`'s optionality, which only matters
-      // under `exactOptionalPropertyTypes` (same class of issue as the
-      // `Vpc`/`IVpc` fix in NetworkConstruct - see ADR 0001).
-      cluster: eksCluster.cluster as eks.ICluster,
+      // EksClusterConstruct implements IWorkloadCluster, so it can be passed
+      // directly; the workload layer depends only on that abstraction, never
+      // on the concrete cluster.
+      cluster: eksCluster,
     });
 
     new cdk.CfnOutput(this, "VpcId", { value: network.vpc.vpcId });

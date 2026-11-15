@@ -1,14 +1,15 @@
-import * as eks from "aws-cdk-lib/aws-eks";
 import { Construct } from "constructs";
+import { IWorkloadCluster } from "@paraprosdokian-htf/eks-cluster";
 
 export interface BackendWorkloadConstructProps {
   /**
-   * Cluster to deploy onto. Only `addManifest` is used, so any `ICluster`
-   * works: the cluster created by `@paraprosdokian-htf/eks-cluster`, or an
-   * existing one imported with `eks.Cluster.fromClusterAttributes` (e.g. from
-   * a separate workloads stack).
+   * Cluster to deploy onto, as the minimal `IWorkloadCluster` contract (only
+   * `addManifest`/`addHelmChart`/`clusterName`). Satisfied by the
+   * `EksClusterConstruct` from `@paraprosdokian-htf/eks-cluster`, by an
+   * existing cluster imported with `eks.Cluster.fromClusterAttributes`, or by a
+   * fake in unit tests — so this construct never needs a real EKS cluster.
    */
-  readonly cluster: eks.ICluster;
+  readonly cluster: IWorkloadCluster;
   readonly namespace?: string;
   /** Image to run until the firm pushes its own build to the ECR repo. */
   readonly placeholderImage?: string;

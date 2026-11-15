@@ -25,10 +25,36 @@ export interface NetworkConstructProps {
 }
 
 /**
- * Networking foundation for the cluster: a 3-tier VPC (public / private-egress
- * / isolated) with flow logs enabled for security auditing.
+ * The networking resources that downstream constructs depend on.
+ *
+ * Downstream constructs (compute, databases, load balancers, ...) should accept
+ * an `INetwork` rather than a concrete `NetworkConstruct`. This keeps them
+ * decoupled from how the network is provisioned: it may be created by
+ * `NetworkConstruct`, imported from another stack, or stubbed in tests.
  */
-export class NetworkConstruct extends Construct {
+export interface INetwork {
+  /** ID of the VPC. */
+  readonly vpcId: string;
+  /**
+   * The VPC itself, for CDK L2 constructs that require an `ec2.IVpc`
+   * (e.g. the EKS cluster, `rds.DatabaseInstance`, `ecs.Cluster`).
+   */
+  readonly vpc: ec2.IVpc;
+  /** Subnets with a route to an Internet Gateway (e.g. for public load balancers). */
+  readonly publicSubnets: ec2.ISubnet[];
+  /** Subnets with egress via NAT but no inbound internet access (e.g. for workloads). */
+  readonly privateSubnets: ec2.ISubnet[];
+  /** Security groups that downstream resources should attach. */
+  readonly securityGroups: ec2.ISecurityGroup[];
+}
+
+/**
+ * Networking foundation for the cluster: a 3-tier VPC (public / private-egress
+ * / isolated) with flow logs enabled for security auditing. Exposes the result
+ * through the `INetwork` contract so downstream constructs depend on the
+ * abstraction rather than this concrete class.
+ */
+export class NetworkConstruct extends Construct implements INetwork {
   // Typed as the interface, not the concrete class: `ec2.Vpc` declares
   // `vpnGatewayId` as `string | undefined` while `ec2.IVpc` declares it
   // optional (`vpnGatewayId?: string`), which `exactOptionalPropertyTypes`
@@ -36,6 +62,13 @@ export class NetworkConstruct extends Construct {
   // downstream consumer at the one place the mismatch actually originates.
   public readonly vpc: ec2.IVpc;
   public readonly flowLogGroup: logs.LogGroup;
+  public readonly vpcId: string;
+  public readonly publicSubnets: ec2.ISubnet[];
+  public readonly privateSubnets: ec2.ISubnet[];
+  // No shared security group is provisioned here: the EKS cluster manages its
+  // own, and downstream constructs attach theirs. Exposed (empty) to satisfy
+  // the INetwork contract without adding an unused SecurityGroup resource.
+  public readonly securityGroups: ec2.ISecurityGroup[] = [];
 
   constructor(scope: Construct, id: string, props: NetworkConstructProps = {}) {
     super(scope, id);
@@ -70,6 +103,10 @@ export class NetworkConstruct extends Construct {
       // `as ec2.IVpc`: aws-cdk-lib's `Vpc.vpnGatewayId` is typed wider than
       // `IVpc.vpnGatewayId`, which only matters under `exactOptionalPropertyTypes`.
     }) as ec2.IVpc;
+
+    this.vpcId = this.vpc.vpcId;
+    this.publicSubnets = this.vpc.publicSubnets;
+    this.privateSubnets = this.vpc.privateSubnets;
 
     // VPC flow logs give an auditable network trail, important for a
     // regulated trading firm's security/compliance posture.

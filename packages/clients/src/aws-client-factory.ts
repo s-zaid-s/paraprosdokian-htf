@@ -1,8 +1,8 @@
-import { STSClientConfig } from '@aws-sdk/client-sts';
-import { Ec2Client, IEc2Client } from './ec2-client';
-import { EcrClient, IEcrClient } from './ecr-client';
-import { EksClient, IEksClient } from './eks-client';
-import { IStsClient, StsClient } from './sts-client';
+import { STSClientConfig } from "@aws-sdk/client-sts";
+import { Ec2Client, IEc2Client } from "./ec2-client";
+import { EcrClient, IEcrClient } from "./ecr-client";
+import { EksClient, IEksClient } from "./eks-client";
+import { IStsClient, StsClient } from "./sts-client";
 
 /**
  * Static credentials or a credentials provider (e.g. `fromIni()` or
@@ -10,7 +10,7 @@ import { IStsClient, StsClient } from './sts-client';
  * Every SDK client accepts the same type; it is taken from the STS config to
  * avoid a direct dependency on `@smithy/types`.
  */
-export type AwsCredentials = NonNullable<STSClientConfig['credentials']>;
+export type AwsCredentials = NonNullable<STSClientConfig["credentials"]>;
 
 /** Configuration shared by every client the factory creates. */
 export interface AwsClientConfig {

@@ -41,15 +41,49 @@ export interface EksClusterConstructProps {
 }
 
 /**
+ * The subset of an EKS cluster that workload constructs need in order to
+ * deploy onto it.
+ *
+ * Workload constructs should accept an `IWorkloadCluster` rather than a
+ * concrete cluster. This stops them from reaching into cluster-level concerns
+ * (capacity, access entries, add-ons, ...) and lets them run against any
+ * cluster that can apply manifests and Helm charts — including a fake in unit
+ * tests. The signatures mirror `eks.ICluster`, so any `eks.ICluster` (e.g. one
+ * imported with `eks.Cluster.fromClusterAttributes`) also satisfies it.
+ */
+export interface IWorkloadCluster {
+  /** Name of the EKS cluster. */
+  readonly clusterName: string;
+  /**
+   * Applies Kubernetes resources to the cluster.
+   *
+   * @param id logical ID of the construct that manages the resources
+   * @param manifest Kubernetes resource specifications
+   */
+  addManifest(id: string, ...manifest: Record<string, unknown>[]): eks.KubernetesManifest;
+  /**
+   * Installs a Helm chart into the cluster.
+   *
+   * @param id logical ID of the construct that manages the release
+   * @param options chart, repository, values, namespace, ...
+   */
+  addHelmChart(id: string, options: eks.HelmChartOptions): eks.HelmChart;
+}
+
+/**
  * A production-shaped (but intentionally minimal) EKS cluster:
  * - KMS-encrypted Kubernetes secrets + full control-plane audit logging
  * - Two managed node groups (system vs. application workloads)
  * - Core addons managed by EKS (vpc-cni, kube-proxy, coredns, ebs-csi-driver)
  * - AWS Load Balancer Controller for ingress
  * - Cluster Autoscaler + metrics-server for elasticity and HPA support
+ *
+ * Exposes the workload-facing surface through `IWorkloadCluster` so workload
+ * constructs depend on that abstraction instead of the concrete cluster.
  */
-export class EksClusterConstruct extends Construct {
+export class EksClusterConstruct extends Construct implements IWorkloadCluster {
   public readonly cluster: eks.Cluster;
+  public readonly clusterName: string;
   public readonly secretsKey: kms.Key;
   public readonly systemNodeGroup: eks.Nodegroup;
   public readonly appNodeGroup: eks.Nodegroup;
@@ -98,6 +132,7 @@ export class EksClusterConstruct extends Construct {
       outputClusterName: true,
       outputConfigCommand: true,
     });
+    this.clusterName = this.cluster.clusterName;
 
     if (props.clusterAdminPrincipalArn) {
       this.cluster.grantAccess("ClusterAdminAccess", props.clusterAdminPrincipalArn, [
@@ -130,6 +165,16 @@ export class EksClusterConstruct extends Construct {
     this.installCoreAddons();
     this.installClusterAutoscaler(region);
     this.installMetricsServer();
+  }
+
+  /** Applies Kubernetes resources to the cluster (see {@link IWorkloadCluster}). */
+  public addManifest(id: string, ...manifest: Record<string, unknown>[]): eks.KubernetesManifest {
+    return this.cluster.addManifest(id, ...manifest);
+  }
+
+  /** Installs a Helm chart into the cluster (see {@link IWorkloadCluster}). */
+  public addHelmChart(id: string, options: eks.HelmChartOptions): eks.HelmChart {
+    return this.cluster.addHelmChart(id, options);
   }
 
   private addManagedNodeGroup(

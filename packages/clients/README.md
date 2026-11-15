@@ -1,4 +1,4 @@
-# @network-infra/clients
+# @htf/clients
 
 Small, class-based wrappers around the AWS SDK v3 for the STS, ECR, EKS and
 EC2 calls this repo uses.
@@ -41,10 +41,13 @@ the environment. The script then checks one account or region but acts on
 another.
 
 ```ts
-import { fromIni } from '@aws-sdk/credential-providers';
-import { AwsClientFactory } from '@network-infra/clients';
+import { fromIni } from "@aws-sdk/credential-providers";
+import { AwsClientFactory } from "@htf/clients";
 
-const factory = new AwsClientFactory({ region: 'eu-west-1', credentials: fromIni({ profile: 'deploy' }) });
+const factory = new AwsClientFactory({
+  region: "eu-west-1",
+  credentials: fromIni({ profile: "deploy" }),
+});
 const sts = factory.createStsClient();
 const ecr = factory.createEcrClient();
 ```
@@ -101,7 +104,7 @@ In the `package.json` of the workspace package that contains your script:
 ```json
 {
   "dependencies": {
-    "@network-infra/clients": "*"
+    "@htf/clients": "*"
   }
 }
 ```
@@ -111,7 +114,7 @@ instead of downloading it.
 
 The package's entry point is its compiled output (`dist/`), so build it before
 running scripts that use it: `npm run build` from the repo root, or
-`npm run build -w @network-infra/clients`.
+`npm run build -w @htf/clients`.
 
 ### Write the script against the interfaces
 
@@ -119,9 +122,15 @@ Take the interfaces as parameters, and create the real clients only at the
 script's entry point:
 
 ```ts
-import { AwsClientFactory, IEcrClient, IStsClient } from '@network-infra/clients';
+import { AwsClientFactory, IEcrClient, IStsClient } from "@htf/clients";
 
-export async function preDeployCheck(sts: IStsClient, ecr: IEcrClient, account: string, repo: string, tag: string) {
+export async function preDeployCheck(
+  sts: IStsClient,
+  ecr: IEcrClient,
+  account: string,
+  repo: string,
+  tag: string,
+) {
   const identity = await sts.getCallerIdentity();
   if (identity.account !== account) {
     throw new Error(`Expected account ${account}, but credentials are for ${identity.account}`);
@@ -135,42 +144,59 @@ export async function preDeployCheck(sts: IStsClient, ecr: IEcrClient, account: 
 // Entry point: the only place that creates real clients.
 if (require.main === module) {
   const factory = new AwsClientFactory(); // region and credentials from the environment
-  preDeployCheck(factory.createStsClient(), factory.createEcrClient(), '123456789012', 'backend', 'v1')
-    .catch((err) => { console.error(err.message); process.exit(1); });
+  preDeployCheck(
+    factory.createStsClient(),
+    factory.createEcrClient(),
+    "123456789012",
+    "backend",
+    "v1",
+  ).catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
 }
 ```
 
 ### Test it with fakes
 
 ```ts
-import { IEcrClient, IStsClient } from '@network-infra/clients';
-import { preDeployCheck } from './pre-deploy-check';
+import { IEcrClient, IStsClient } from "@htf/clients";
+import { preDeployCheck } from "./pre-deploy-check";
 
 const sts: IStsClient = {
-  getCallerIdentity: async () => ({ account: '123456789012', arn: 'arn:aws:iam::123456789012:user/ci', userId: 'AIDA' }),
+  getCallerIdentity: async () => ({
+    account: "123456789012",
+    arn: "arn:aws:iam::123456789012:user/ci",
+    userId: "AIDA",
+  }),
 };
 const ecr: IEcrClient = {
   describeImages: async () => [],
-  batchGetImage: async (_repo, imageIds) => ({ images: [], failures: imageIds.map((imageId) => ({ imageId })) }),
+  batchGetImage: async (_repo, imageIds) => ({
+    images: [],
+    failures: imageIds.map((imageId) => ({ imageId })),
+  }),
 };
 
-test('fails when the image tag is missing', async () => {
-  await expect(preDeployCheck(sts, ecr, '123456789012', 'backend', 'v1')).rejects.toThrow('not found');
+test("fails when the image tag is missing", async () => {
+  await expect(preDeployCheck(sts, ecr, "123456789012", "backend", "v1")).rejects.toThrow(
+    "not found",
+  );
 });
 ```
 
 ## API
 
-| Class (interface) | Method | Returns |
-|---|---|---|
-| `StsClient` (`IStsClient`) | `getCallerIdentity()` | `{ account, arn, userId }` |
-| `EcrClient` (`IEcrClient`) | `describeImages(repositoryName, imageIds?)` | `ImageDetail[]` (all pages) |
-| | `batchGetImage(repositoryName, imageIds)` | `{ images, failures }` |
-| `EksClient` (`IEksClient`) | `describeCluster(name)` | `Cluster` |
-| `Ec2Client` (`IEc2Client`) | `describeVpcs({ vpcIds?, filters? })` | `Vpc[]` (all pages) |
-| | `describeSubnets({ subnetIds?, filters? })` | `Subnet[]` (all pages) |
-| | `describeAvailabilityZones({ zoneNames?, filters?, allAvailabilityZones? })` | `AvailabilityZone[]` |
-| `AwsClientFactory` | `createStsClient()`, `createEcrClient()`, `createEksClient()`, `createEc2Client()` | the interface for each client |
+| Class (interface)          | Method                                                                             | Returns                       |
+| -------------------------- | ---------------------------------------------------------------------------------- | ----------------------------- |
+| `StsClient` (`IStsClient`) | `getCallerIdentity()`                                                              | `{ account, arn, userId }`    |
+| `EcrClient` (`IEcrClient`) | `describeImages(repositoryName, imageIds?)`                                        | `ImageDetail[]` (all pages)   |
+|                            | `batchGetImage(repositoryName, imageIds)`                                          | `{ images, failures }`        |
+| `EksClient` (`IEksClient`) | `describeCluster(name)`                                                            | `Cluster`                     |
+| `Ec2Client` (`IEc2Client`) | `describeVpcs({ vpcIds?, filters? })`                                              | `Vpc[]` (all pages)           |
+|                            | `describeSubnets({ subnetIds?, filters? })`                                        | `Subnet[]` (all pages)        |
+|                            | `describeAvailabilityZones({ zoneNames?, filters?, allAvailabilityZones? })`       | `AvailabilityZone[]`          |
+| `AwsClientFactory`         | `createStsClient()`, `createEcrClient()`, `createEksClient()`, `createEc2Client()` | the interface for each client |
 
 Each class's constructor also accepts SDK client config or an existing SDK
 client, for the rare case where one client needs different settings from the
@@ -190,6 +216,6 @@ factory's.
 ## Development
 
 ```sh
-npm run build -w @network-infra/clients   # compile to dist/
-npm test -w @network-infra/clients        # run the tests
+npm run build -w @htf/clients   # compile to dist/
+npm test -w @htf/clients        # run the tests
 ```
