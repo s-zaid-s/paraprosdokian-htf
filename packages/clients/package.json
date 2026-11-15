@@ -1,0 +1,27 @@
+{
+  "name": "@network-infra/clients",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Thin class-based wrappers around the AWS SDK v3, exposing only the calls this repo uses.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.1162.0",
+    "@aws-sdk/client-ecr": "^3.1156.0",
+    "@aws-sdk/client-eks": "^3.1164.0",
+    "@aws-sdk/client-sts": "^3.1164.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.0.0",
+    "aws-sdk-client-mock": "^4.1.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "~5.9.3"
+  }
+}
