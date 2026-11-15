@@ -10,8 +10,14 @@ export interface CallerIdentity {
   readonly userId: string;
 }
 
-/** Wrapper around the SDK `STSClient`, exposing only the calls this repo uses. */
-export class StsClient {
+/** The STS operations this repo uses. Depend on this rather than `StsClient`. */
+export interface IStsClient {
+  /** Returns the account, ARN and user ID of the credentials in use. */
+  getCallerIdentity(): Promise<CallerIdentity>;
+}
+
+/** `IStsClient` backed by the AWS SDK v3 `STSClient`. */
+export class StsClient implements IStsClient {
   private readonly client: STSClient;
 
   /** @param configOrClient SDK client config (region, credentials, ...) or an existing `STSClient` to reuse. */
@@ -19,7 +25,6 @@ export class StsClient {
     this.client = configOrClient instanceof STSClient ? configOrClient : new STSClient(configOrClient);
   }
 
-  /** Returns the account, ARN and user ID of the credentials in use. */
   public async getCallerIdentity(): Promise<CallerIdentity> {
     const { Account, Arn, UserId } = await this.client.send(new GetCallerIdentityCommand({}));
     if (!Account || !Arn || !UserId) {

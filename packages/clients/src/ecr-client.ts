@@ -17,31 +17,18 @@ export interface BatchGetImageResult {
   readonly failures: ImageFailure[];
 }
 
-/** Wrapper around the SDK `ECRClient`, exposing only the calls this repo uses. */
-export class EcrClient {
-  private readonly client: ECRClient;
-
-  /** @param configOrClient SDK client config (region, credentials, ...) or an existing `ECRClient` to reuse. */
-  constructor(configOrClient: ECRClientConfig | ECRClient = {}) {
-    this.client = configOrClient instanceof ECRClient ? configOrClient : new ECRClient(configOrClient);
-  }
-
+/** The ECR operations this repo uses. Depend on this rather than `EcrClient`. */
+export interface IEcrClient {
   /**
-   * Describes images in a repository, following all pages.
+   * Describes images in a repository. Returns all results (not just the first page).
    *
-   * Note: ECR throws `ImageNotFoundException` if any requested image does not
-   * exist. To check for existence without an exception, use `batchGetImage`.
+   * Throws if any requested image does not exist (ECR's `ImageNotFoundException`).
+   * To check for existence without an exception, use `batchGetImage`.
    *
    * @param repositoryName the ECR repository
    * @param imageIds specific images to describe; omit to describe all images
    */
-  public async describeImages(repositoryName: string, imageIds?: ImageIdentifier[]): Promise<ImageDetail[]> {
-    const details: ImageDetail[] = [];
-    for await (const page of paginateDescribeImages({ client: this.client }, { repositoryName, imageIds })) {
-      details.push(...(page.imageDetails ?? []));
-    }
-    return details;
-  }
+  describeImages(repositoryName: string, imageIds?: ImageIdentifier[]): Promise<ImageDetail[]>;
 
   /**
    * Gets image manifests. Images that don't exist are reported in `failures`
@@ -51,6 +38,26 @@ export class EcrClient {
    * @param repositoryName the ECR repository
    * @param imageIds the images to get, by tag and/or digest
    */
+  batchGetImage(repositoryName: string, imageIds: ImageIdentifier[]): Promise<BatchGetImageResult>;
+}
+
+/** `IEcrClient` backed by the AWS SDK v3 `ECRClient`. */
+export class EcrClient implements IEcrClient {
+  private readonly client: ECRClient;
+
+  /** @param configOrClient SDK client config (region, credentials, ...) or an existing `ECRClient` to reuse. */
+  constructor(configOrClient: ECRClientConfig | ECRClient = {}) {
+    this.client = configOrClient instanceof ECRClient ? configOrClient : new ECRClient(configOrClient);
+  }
+
+  public async describeImages(repositoryName: string, imageIds?: ImageIdentifier[]): Promise<ImageDetail[]> {
+    const details: ImageDetail[] = [];
+    for await (const page of paginateDescribeImages({ client: this.client }, { repositoryName, imageIds })) {
+      details.push(...(page.imageDetails ?? []));
+    }
+    return details;
+  }
+
   public async batchGetImage(repositoryName: string, imageIds: ImageIdentifier[]): Promise<BatchGetImageResult> {
     const output = await this.client.send(new BatchGetImageCommand({ repositoryName, imageIds }));
     return { images: output.images ?? [], failures: output.failures ?? [] };
