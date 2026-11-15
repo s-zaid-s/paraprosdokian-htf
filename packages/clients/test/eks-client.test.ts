@@ -6,6 +6,19 @@ const eks = mockClient(EKSClient);
 beforeEach(() => eks.reset());
 
 describe('EksClient', () => {
+  test('describeCluster sends exactly one DescribeClusterCommand with the cluster name', async () => {
+    eks.on(DescribeClusterCommand).resolves({ cluster: { name: 'prod' } });
+
+    await new EksClient().describeCluster('prod');
+
+    // Exactly one SDK call was made, and it was a DescribeClusterCommand.
+    expect(eks.calls()).toHaveLength(1);
+    const [call] = eks.commandCalls(DescribeClusterCommand);
+    expect(call).toBeDefined();
+    // toEqual (not toMatchObject) so unexpected extra parameters also fail the test.
+    expect(call.args[0].input).toEqual({ name: 'prod' });
+  });
+
   test('describeCluster returns the cluster', async () => {
     eks.on(DescribeClusterCommand, { name: 'prod' }).resolves({ cluster: { name: 'prod', status: 'ACTIVE' } });
 
