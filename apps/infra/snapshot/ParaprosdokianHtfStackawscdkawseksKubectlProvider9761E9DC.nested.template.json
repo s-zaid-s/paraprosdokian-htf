@@ -1,0 +1,310 @@
+{
+ "Resources": {
+  "Handler886CB40B": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-892242895576-eu-west-1",
+     "S3Key": "a4a3a38c8e5a85724e76a5d93eb8b8985f94e4ef5ff9f769aa88aad6b6c1c5bf.zip"
+    },
+    "Description": "onEvent handler for EKS kubectl resource provider",
+    "Environment": {
+     "Variables": {
+      "AWS_STS_REGIONAL_ENDPOINTS": "regional"
+     }
+    },
+    "Handler": "index.handler",
+    "Layers": [
+     {
+      "Ref": "AwsCliLayerF44AAF94"
+     },
+     {
+      "Ref": "referencetoParaprosdokianHtfStackEksClusterKubectlLayer9198C5FBRef"
+     }
+    ],
+    "MemorySize": 1024,
+    "Role": {
+     "Ref": "referencetoParaprosdokianHtfStackEksClusterKubectlHandlerRole8F392500Arn"
+    },
+    "Runtime": "python3.13",
+    "Timeout": 900,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Ref": "referencetoParaprosdokianHtfStackEksCluster02753D47ClusterSecurityGroupId"
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet1Subnet895BCB44Ref"
+      },
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet2Subnet83749C66Ref"
+      },
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet3Subnet545BBF2DRef"
+      }
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Handler/Resource",
+    "aws:asset:path": "asset.a4a3a38c8e5a85724e76a5d93eb8b8985f94e4ef5ff9f769aa88aad6b6c1c5bf",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "HandlerLogGroup50A7B41D": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "Handler886CB40B"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Handler/LogGroup/Resource"
+   }
+  },
+  "AwsCliLayerF44AAF94": {
+   "Type": "AWS::Lambda::LayerVersion",
+   "Properties": {
+    "Content": {
+     "S3Bucket": "cdk-hnb659fds-assets-892242895576-eu-west-1",
+     "S3Key": "98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip"
+    },
+    "Description": "/opt/awscli/aws"
+   },
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/AwsCliLayer/Resource",
+    "aws:asset:path": "asset.98f62bef9320f8c0a0a7be21d7c746f069131f196f51ffe3008a6bb730b368ec.zip",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Content"
+   }
+  },
+  "ProviderframeworkonEventServiceRole9FF04296": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     },
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Provider/framework-onEvent/ServiceRole/Resource"
+   }
+  },
+  "ProviderframeworkonEventServiceRoleDefaultPolicy48CD2133": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "Handler886CB40B",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "Handler886CB40B",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:GetFunction",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "Handler886CB40B",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ProviderframeworkonEventServiceRoleDefaultPolicy48CD2133",
+    "Roles": [
+     {
+      "Ref": "ProviderframeworkonEventServiceRole9FF04296"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Provider/framework-onEvent/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "ProviderframeworkonEvent83C1D0A7": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-892242895576-eu-west-1",
+     "S3Key": "5c9fd00ba20b9f0f8161f2bd2ccae0f9c29df2b76d34155b8bf281abc354adc8.zip"
+    },
+    "Description": "AWS CDK resource provider framework - onEvent (ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Provider)",
+    "Environment": {
+     "Variables": {
+      "USER_ON_EVENT_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "Handler886CB40B",
+        "Arn"
+       ]
+      }
+     }
+    },
+    "Handler": "framework.onEvent",
+    "LoggingConfig": {
+     "ApplicationLogLevel": "FATAL",
+     "LogFormat": "JSON"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "ProviderframeworkonEventServiceRole9FF04296",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 900,
+    "VpcConfig": {
+     "SecurityGroupIds": [
+      {
+       "Ref": "referencetoParaprosdokianHtfStackEksCluster02753D47ClusterSecurityGroupId"
+      }
+     ],
+     "SubnetIds": [
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet1Subnet895BCB44Ref"
+      },
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet2Subnet83749C66Ref"
+      },
+      {
+       "Ref": "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet3Subnet545BBF2DRef"
+      }
+     ]
+    }
+   },
+   "DependsOn": [
+    "ProviderframeworkonEventServiceRoleDefaultPolicy48CD2133",
+    "ProviderframeworkonEventServiceRole9FF04296"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Provider/framework-onEvent/Resource",
+    "aws:asset:path": "asset.5c9fd00ba20b9f0f8161f2bd2ccae0f9c29df2b76d34155b8bf281abc354adc8",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "ProviderframeworkonEventLogGroup683073A3": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "ProviderframeworkonEvent83C1D0A7"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 731
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "ParaprosdokianHtfStack/@aws-cdk--aws-eks.KubectlProvider/Provider/framework-onEvent/LogGroup/Resource"
+   }
+  }
+ },
+ "Outputs": {
+  "ParaprosdokianHtfStackawscdkawseksKubectlProviderframeworkonEvent81666F04Arn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ProviderframeworkonEvent83C1D0A7",
+     "Arn"
+    ]
+   }
+  }
+ },
+ "Parameters": {
+  "referencetoParaprosdokianHtfStackEksClusterKubectlLayer9198C5FBRef": {
+   "Type": "String"
+  },
+  "referencetoParaprosdokianHtfStackEksClusterKubectlHandlerRole8F392500Arn": {
+   "Type": "String"
+  },
+  "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet1Subnet895BCB44Ref": {
+   "Type": "String"
+  },
+  "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet2Subnet83749C66Ref": {
+   "Type": "String"
+  },
+  "referencetoParaprosdokianHtfStackNetworkVpcprivateeksSubnet3Subnet545BBF2DRef": {
+   "Type": "String"
+  },
+  "referencetoParaprosdokianHtfStackEksCluster02753D47ClusterSecurityGroupId": {
+   "Type": "String"
+  }
+ }
+}
