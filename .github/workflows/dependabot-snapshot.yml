@@ -37,13 +37,13 @@ jobs:
       changed: ${{ steps.diff.outputs.changed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload snapshot
         if: steps.diff.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: synth-snapshot
           path: apps/infra/snapshot/
@@ -81,7 +81,7 @@ jobs:
       actions: write # start CI for that commit (last step)
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Exactly the commit that was synthesized. If Dependabot has pushed
           # since, the push below is rejected, and the new push re-runs this
@@ -89,7 +89,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Download snapshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: synth-snapshot
           path: ${{ runner.temp }}/snapshot

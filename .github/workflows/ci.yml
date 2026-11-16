@@ -29,14 +29,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # No `cache: npm` here: node_modules is cached directly below. setup-node's
       # ~/.npm cache would be downloaded on every run, only to be unused whenever
       # node_modules is restored.
       - name: Set up Node.js
         id: setup-node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           # Same Node version contributors use locally (`nvm use` reads it too).
           node-version-file: .nvmrc
@@ -49,7 +49,7 @@ jobs:
       # and the lockfile disagree.
       - name: Restore node_modules
         id: node-modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             node_modules
@@ -65,7 +65,7 @@ jobs:
       # fails lint or tests still caches its dependencies for the next push.
       - name: Save node_modules
         if: steps.node-modules.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             node_modules
@@ -85,7 +85,7 @@ jobs:
       # last run, or else main's.
       - name: Restore TypeScript build output
         id: tsc-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             packages/*/dist
@@ -110,7 +110,7 @@ jobs:
       # reason as node_modules. Later steps rerun tsc -b but change nothing.
       - name: Save TypeScript build output
         if: steps.tsc-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             packages/*/dist
@@ -157,7 +157,7 @@ jobs:
       # apps/infra/snapshot/ instead of synthesizing locally.
       - name: Upload synthesized templates
         if: failure() && steps.snapshot.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: synth-snapshot
           path: apps/infra/cdk.out/*.template.json
