@@ -25,11 +25,11 @@
     "@aws-cdk/lambda-layer-kubectl-v32": "^2.1.0"
   },
   "peerDependencies": {
-    "aws-cdk-lib": "^2.239.0",
+    "aws-cdk-lib": "^2.277.0",
     "constructs": "^10.8.1"
   },
   "devDependencies": {
-    "aws-cdk-lib": "^2.239.0",
+    "aws-cdk-lib": "^2.277.0",
     "constructs": "^10.8.1"
   }
 }
